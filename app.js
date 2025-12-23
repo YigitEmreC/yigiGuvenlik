@@ -1,5 +1,7 @@
 const plateInput = document.getElementById("plateInput");
 const suggestionsEl = document.getElementById("suggestions");
+const btnClear = document.getElementById("btnClear");
+
 const resultBox = document.getElementById("result");
 const resultTitle = document.getElementById("resultTitle");
 const resultSub = document.getElementById("resultSub");
@@ -7,11 +9,23 @@ const stats = document.getElementById("stats");
 
 // Map: plate_norm -> { plateRaw, name, apartment }
 let whitelist = new Map();
-let entries = []; // array version for searching
+let entries = [];
 let whitelistLoaded = false;
 
 function normPlate(p) {
   return (p || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function normTextTR(s) {
+  // makes searching Turkish names easier
+  return (s || "")
+    .toLowerCase()
+    .replaceAll("ç","c")
+    .replaceAll("ğ","g")
+    .replaceAll("ı","i")
+    .replaceAll("ö","o")
+    .replaceAll("ş","s")
+    .replaceAll("ü","u");
 }
 
 function setResult(state, title, sub) {
@@ -22,7 +36,7 @@ function setResult(state, title, sub) {
 }
 
 function splitLine(line) {
-  // TR Excel sometimes uses ; instead of ,
+  // TR Excel often uses ';'
   const delim = line.includes(";") && !line.includes(",") ? ";" : ",";
   return line.split(delim).map(s => s.trim());
 }
@@ -30,13 +44,13 @@ function splitLine(line) {
 function parseWhitelistCSV(text) {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const map = new Map();
-  if (lines.length === 0) return map;
+  if (!lines.length) return map;
 
   const first = splitLine(lines[0]).map(x => x.toLowerCase());
   const hasHeader = first.includes("plate") || first.includes("plaka");
-  const startIdx = hasHeader ? 1 : 0;
+  const start = hasHeader ? 1 : 0;
 
-  for (let i = startIdx; i < lines.length; i++) {
+  for (let i = start; i < lines.length; i++) {
     const line = lines[i];
     if (!line || line.startsWith("#")) continue;
 
@@ -50,22 +64,22 @@ function parseWhitelistCSV(text) {
 
     map.set(plate_norm, { plateRaw, name, apartment });
   }
-
   return map;
 }
 
-function buildEntriesFromMap(map) {
+function buildEntries(map) {
   const arr = [];
   for (const [plate_norm, v] of map.entries()) {
     arr.push({
       plate_norm,
-      plateRaw: v.plateRaw,
-      name: v.name,
-      apartment: v.apartment,
-      nameLower: (v.name || "").toLowerCase(),
-      aptLower: (v.apartment || "").toLowerCase()
+      plateRaw: v.plateRaw || plate_norm,
+      name: v.name || "",
+      apartment: v.apartment || "",
+      nameSearch: normTextTR(v.name || ""),
+      aptSearch: normTextTR(v.apartment || "")
     });
   }
+  arr.sort((a,b) => a.plate_norm.localeCompare(b.plate_norm));
   return arr;
 }
 
@@ -77,98 +91,101 @@ function renderSuggestions(list) {
     const div = document.createElement("div");
     div.className = "sug";
     div.innerHTML = `
-      <div class="sugTop">${item.plateRaw || item.plate_norm}</div>
-      <div class="sugBottom">${[item.name, item.apartment].filter(Boolean).join(" • ")}</div>
+      <div class="sugLeft">${item.plateRaw}</div>
+      <div class="sugRight">${[item.name, item.apartment].filter(Boolean).join(" • ")}</div>
     `;
     div.addEventListener("click", () => {
-      plateInput.value = item.plateRaw || item.plate_norm;
-      checkInput(true); // force check as "selected"
+      plateInput.value = item.plateRaw;
+      checkInput(true);
     });
     suggestionsEl.appendChild(div);
   }
 }
 
-function scoreMatch(qNorm, qTextLower, e) {
-  // Lower score = better
-  // Plate scoring
-  if (qNorm) {
-    if (e.plate_norm === qNorm) return 0;
-    if (e.plate_norm.startsWith(qNorm)) return 1;
-    if (e.plate_norm.includes(qNorm)) return 2;
-  }
-
-  // Name/apartment scoring
-  if (qTextLower) {
-    if (e.nameLower && e.nameLower.startsWith(qTextLower)) return 3;
-    if (e.nameLower && e.nameLower.includes(qTextLower)) return 4;
-    if (e.aptLower && e.aptLower.startsWith(qTextLower)) return 5;
-    if (e.aptLower && e.aptLower.includes(qTextLower)) return 6;
-  }
-
-  return 999;
-}
-
-function findSuggestions(qNorm, qTextLower) {
-  // Keep it fast: compute score + filter out non-matches
-  const scored = [];
-  for (const e of entries) {
-    const s = scoreMatch(qNorm, qTextLower, e);
-    if (s !== 999) scored.push({ s, e });
-  }
-
-  scored.sort((a, b) => {
-    if (a.s !== b.s) return a.s - b.s;
-    // tie-breaker: closer length match for plate
-    return a.e.plate_norm.length - b.e.plate_norm.length;
-  });
-
-  return scored.slice(0, 6).map(x => x.e);
-}
-
-function checkInput(selected = false) {
-  const raw = (plateInput.value || "").trim();
+function getSuggestions(raw) {
   const qNorm = normPlate(raw);
-  const qTextLower = raw.toLowerCase();
+  const qText = normTextTR(raw.trim());
 
+  // start suggesting after 2 chars
+  if (raw.trim().length < 2) return [];
+
+  const matches = [];
+  for (const e of entries) {
+    let score = 999;
+
+    // plate-first matching
+    if (qNorm) {
+      if (e.plate_norm === qNorm) score = 0;
+      else if (e.plate_norm.startsWith(qNorm)) score = 1;
+      else if (e.plate_norm.includes(qNorm)) score = 2;
+    }
+
+    // name / apartment matching
+    if (score === 999 && qText) {
+      if (e.nameSearch.startsWith(qText)) score = 3;
+      else if (e.nameSearch.includes(qText)) score = 4;
+      else if (e.aptSearch.startsWith(qText)) score = 5;
+      else if (e.aptSearch.includes(qText)) score = 6;
+    }
+
+    if (score !== 999) matches.push({ score, e });
+  }
+
+  matches.sort((a,b) => a.score - b.score);
+  return matches.slice(0, 6).map(x => x.e);
+}
+
+function clearAll() {
+  plateInput.value = "";
+  renderSuggestions([]);
+  setResult("neutral", "—", "Type a plate / name / apartment");
+  plateInput.focus();
+}
+
+function checkInput(finalCheck = false) {
   if (!whitelistLoaded) {
-    setResult("neutral", "Waiting…", "Whitelist not loaded");
+    setResult("neutral", "—", "Whitelist not loaded");
     renderSuggestions([]);
     return;
   }
 
-  if (!raw) {
-    setResult("neutral", "Waiting…", "Type plate / name / apartment");
+  const raw = plateInput.value || "";
+  const qNorm = normPlate(raw);
+
+  if (!raw.trim()) {
+    setResult("neutral", "—", "Type a plate / name / apartment");
     renderSuggestions([]);
     return;
   }
 
-  // Exact plate match → GREEN
+  // EXACT plate => YES / GREEN
   const exact = whitelist.get(qNorm);
   if (exact) {
     const info = [exact.name, exact.apartment].filter(Boolean).join(" • ");
-    setResult("green", "YES", info ? info : "Authorized");
+    setResult("green", "YES", info || "Authorized");
     renderSuggestions([]);
     return;
   }
 
-  // Not exact → show “Did you mean…”
-  const sugs = findSuggestions(qNorm, qTextLower);
+  // partial => suggestions
+  const sugs = getSuggestions(raw);
   renderSuggestions(sugs);
 
-  // If user tapped a suggestion (selected=true) or query is quite specific but no hits → RED
-  if (selected || (qNorm.length >= 5 && sugs.length === 0)) {
+  if (sugs.length) {
+    setResult("neutral", "…", "Pick a suggestion (or keep typing)");
+  } else if (finalCheck) {
     setResult("red", "NO", "Not authorized");
-  } else if (sugs.length > 0) {
-    setResult("neutral", "Did you mean…", "Tap one of the suggestions");
   } else {
-    setResult("neutral", "Keep typing…", "No suggestions yet");
+    setResult("neutral", "…", "No matches yet");
   }
 }
 
 plateInput.addEventListener("input", () => checkInput(false));
 plateInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") checkInput(true); // treat Enter as a “final check”
+  if (e.key === "Enter") checkInput(true);
 });
+
+btnClear.addEventListener("click", clearAll);
 
 async function loadWhitelist() {
   try {
@@ -178,15 +195,15 @@ async function loadWhitelist() {
 
     const text = await res.text();
     whitelist = parseWhitelistCSV(text);
-    entries = buildEntriesFromMap(whitelist);
+    entries = buildEntries(whitelist);
     whitelistLoaded = true;
 
     stats.textContent = `Whitelist loaded: ${whitelist.size} cars`;
-    setResult("neutral", "Waiting…", "Type plate / name / apartment");
+    setResult("neutral", "—", "Type a plate / name / apartment");
   } catch (e) {
     whitelistLoaded = false;
     stats.textContent = `Whitelist NOT loaded: ${e.message}`;
-    setResult("neutral", "Waiting…", "Whitelist not loaded");
+    setResult("neutral", "—", "Whitelist not loaded");
   }
 }
 
