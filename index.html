@@ -5,45 +5,128 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Plate Check</title>
 
-  <!-- version params help GitHub cache refresh -->
-  <link rel="stylesheet" href="./styles.css?v=6" />
+  <!-- bump v to refresh cache -->
+  <link rel="stylesheet" href="./styles.css?v=20" />
 </head>
 
 <body>
   <main class="wrap">
     <div class="card">
 
-      <!-- RESULT ABOVE SEARCH -->
-      <div id="result" class="result neutral">
-        <div id="resultTitle" class="resultTitle">—</div>
-        <div id="resultSub" class="resultSub">Type a plate / name / apartment</div>
-      </div>
+      <!-- TABS -->
+      <nav class="tabs" aria-label="Navigation">
+        <button class="tabBtn active" data-tab="check" type="button">Plate Check</button>
+        <button class="tabBtn" data-tab="manage" type="button">Manage</button>
+      </nav>
 
-      <!-- SEARCH BAR + CLEAR BUTTON -->
-      <div class="searchRow">
-        <input
-          id="plateInput"
-          class="plateInput"
-          placeholder="Search plate…"
-          autocomplete="off"
-          inputmode="latin"
-        />
+      <!-- TAB: CHECK -->
+      <section id="tab-check" class="tabSection">
+        <div id="result" class="result neutral">
+          <div id="resultTitle" class="resultTitle">—</div>
+          <div id="resultSub" class="resultSub">Type a plate / name / apartment</div>
+        </div>
 
-        <button id="btnClear" class="clearBtn" type="button" aria-label="Clear">
-          <!-- put icon-128.png in the same folder -->
-          <img src="./icon-128.png" alt="" />
-        </button>
-      </div>
+        <div class="searchRow">
+          <input
+            id="plateInput"
+            class="plateInput"
+            placeholder="Search plate…"
+            autocomplete="off"
+            inputmode="latin"
+          />
 
-      <!-- SUGGESTIONS -->
-      <div id="suggestions" class="suggestions"></div>
+          <!-- SCAN button (camera) -->
+          <button id="btnScan" class="scanBtn" type="button" aria-label="Scan plate">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 6.5 10.2 5h3.6L15 6.5H18a3 3 0 0 1 3 3V18a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V9.5a3 3 0 0 1 3-3h3Z"
+                    fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+              <path d="M12 17a3.2 3.2 0 1 0 0-6.4A3.2 3.2 0 0 0 12 17Z"
+                    fill="none" stroke="currentColor" stroke-width="1.8"/>
+            </svg>
+          </button>
 
-      <div class="footer">
-        <div class="stats" id="stats">Loading whitelist…</div>
-      </div>
+          <!-- CLEAR button -->
+          <button id="btnClear" class="clearBtn" type="button" aria-label="Clear">
+            <img id="clearImg" src="./icon-128.png" alt="" />
+            <svg id="clearSvg" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+            </svg>
+          </button>
+
+          <!-- hidden camera input (opens phone camera) -->
+          <input id="camInput" class="hidden" type="file" accept="image/*" capture="environment" />
+        </div>
+
+        <div id="suggestions" class="suggestions"></div>
+
+        <div class="footer">
+          <div class="stats" id="stats">Loading whitelist…</div>
+        </div>
+      </section>
+
+      <!-- TAB: MANAGE -->
+      <section id="tab-manage" class="tabSection hidden">
+
+        <div class="panel">
+          <div class="panelTitle">Cloudflare API (recommended)</div>
+          <div class="smallNote">
+            Set your Worker base URL + APP_KEY. This enables add/delete + scan on any device.
+            If you leave this empty, the site uses <b>whitelist.csv</b> + saves edits on this device only.
+          </div>
+
+          <div class="grid2">
+            <div>
+              <label class="lbl">API Base URL</label>
+              <input id="apiBase" class="in" placeholder="https://xxxxx.workers.dev" />
+            </div>
+            <div>
+              <label class="lbl">APP_KEY</label>
+              <input id="apiKey" class="in" type="password" placeholder="(kept on this device)" />
+            </div>
+
+            <button id="btnSaveSettings" class="btnPrimary" type="button">Save settings</button>
+            <button id="btnReload" class="btnGhost" type="button">Reload data</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panelTitle">Add / Update plate</div>
+          <div class="grid3">
+            <div>
+              <label class="lbl">Plate</label>
+              <input id="mPlate" class="in" placeholder="34 ABC 123" />
+            </div>
+            <div>
+              <label class="lbl">Name</label>
+              <input id="mName" class="in" placeholder="Name Surname" />
+            </div>
+            <div>
+              <label class="lbl">Apartment</label>
+              <input id="mApt" class="in" placeholder="C-03" />
+            </div>
+
+            <button id="btnAdd" class="btnPrimary" type="button">Save / Update</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panelTitle">Current list</div>
+
+          <div class="listTop">
+            <input id="mSearch" class="in" placeholder="Search plate / name / apt…" />
+            <button id="btnExport" class="btnGhost" type="button">Export CSV</button>
+          </div>
+
+          <div id="modeInfo" class="smallNote" style="margin-top:10px;"></div>
+
+          <div id="manageList" class="manageList"></div>
+        </div>
+
+      </section>
+
     </div>
   </main>
 
-  <script src="./app.js?v=6"></script>
+  <script src="./app.js?v=20"></script>
 </body>
 </html>
