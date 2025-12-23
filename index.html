@@ -4,35 +4,46 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Plate Check</title>
-  <link rel="stylesheet" href="./styles.css" />
+
+  <!-- version params help GitHub cache refresh -->
+  <link rel="stylesheet" href="./styles.css?v=6" />
 </head>
 
 <body>
   <main class="wrap">
     <div class="card">
-      <h1>Plate Check</h1>
-      <p class="hint">Type plate / name / apartment. Tap a suggestion.</p>
 
-      <input
-        id="plateInput"
-        class="plateInput"
-        placeholder="Search plate…"
-        autocomplete="off"
-        inputmode="latin"
-      />
-
-      <!-- NEW -->
-      <div id="suggestions" class="suggestions"></div>
-
+      <!-- RESULT ABOVE SEARCH -->
       <div id="result" class="result neutral">
-        <div id="resultTitle" class="resultTitle">Waiting…</div>
-        <div id="resultSub" class="resultSub">Whitelist not loaded yet</div>
+        <div id="resultTitle" class="resultTitle">—</div>
+        <div id="resultSub" class="resultSub">Type a plate / name / apartment</div>
       </div>
 
-      <div class="small" id="stats">—</div>
+      <!-- SEARCH BAR + CLEAR BUTTON -->
+      <div class="searchRow">
+        <input
+          id="plateInput"
+          class="plateInput"
+          placeholder="Search plate…"
+          autocomplete="off"
+          inputmode="latin"
+        />
+
+        <button id="btnClear" class="clearBtn" type="button" aria-label="Clear">
+          <!-- put icon-128.png in the same folder -->
+          <img src="./icon-128.png" alt="" />
+        </button>
+      </div>
+
+      <!-- SUGGESTIONS -->
+      <div id="suggestions" class="suggestions"></div>
+
+      <div class="footer">
+        <div class="stats" id="stats">Loading whitelist…</div>
+      </div>
     </div>
   </main>
 
-  <script src="./app.js"></script>
+  <script src="./app.js?v=6"></script>
 </body>
 </html>
