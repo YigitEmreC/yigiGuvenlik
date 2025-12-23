@@ -214,7 +214,7 @@ function checkInput(finalCheck = false) {
   const exact = whitelist.get(qNorm);
   if (exact && !exact.deleted) {
     const info = [exact.name, exact.apartment].filter(Boolean).join(" • ");
-    setResult("green", "YES", info || "Authorized");
+    setResult("green", "Sal baba geçsin", info || "Park yeri sahibi");
     renderSuggestions([]);
     return;
   }
@@ -222,9 +222,9 @@ function checkInput(finalCheck = false) {
   const sugs = getSuggestions(raw);
   renderSuggestions(sugs);
 
-  if (sugs.length) setResult("neutral", "…", "Pick a suggestion (or keep typing)");
-  else if (finalCheck) setResult("red", "NO", "Not authorized");
-  else setResult("neutral", "…", "No matches yet");
+  if (sugs.length) setResult("neutral", "…", "Bir öneriyi seçin, veya ekleme yapın)");
+  else if (finalCheck) setResult("red", "Tanımam etmem", "Park yeri mevcut değil");
+  else setResult("neutral", "…", "eşleşme yok");
 }
 
 // ======================= Tabs (PIN protected) =======================
@@ -557,3 +557,4 @@ if ("serviceWorker" in navigator) {
 
 // Start
 loadWhitelist().then(() => plateInput.focus());
+
