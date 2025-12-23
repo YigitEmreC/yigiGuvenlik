@@ -1,23 +1,58 @@
+// ===== Elements (check tab)
 const plateInput = document.getElementById("plateInput");
 const suggestionsEl = document.getElementById("suggestions");
 const btnClear = document.getElementById("btnClear");
+const btnScan = document.getElementById("btnScan");
+const camInput = document.getElementById("camInput");
+
+const clearImg = document.getElementById("clearImg");
+const clearSvg = document.getElementById("clearSvg");
 
 const resultBox = document.getElementById("result");
 const resultTitle = document.getElementById("resultTitle");
 const resultSub = document.getElementById("resultSub");
 const stats = document.getElementById("stats");
 
-// Map: plate_norm -> { plateRaw, name, apartment }
+// ===== Tabs
+const tabBtns = [...document.querySelectorAll(".tabBtn")];
+const tabCheck = document.getElementById("tab-check");
+const tabManage = document.getElementById("tab-manage");
+
+// ===== Manage tab elements
+const apiBaseEl = document.getElementById("apiBase");
+const apiKeyEl = document.getElementById("apiKey");
+const btnSaveSettings = document.getElementById("btnSaveSettings");
+const btnReload = document.getElementById("btnReload");
+
+const mPlate = document.getElementById("mPlate");
+const mName = document.getElementById("mName");
+const mApt = document.getElementById("mApt");
+const btnAdd = document.getElementById("btnAdd");
+
+const mSearch = document.getElementById("mSearch");
+const btnExport = document.getElementById("btnExport");
+const manageList = document.getElementById("manageList");
+const modeInfo = document.getElementById("modeInfo");
+
+// ===== Storage keys
+const LS_API_BASE = "gc_api_base_v1";
+const LS_API_KEY = "gc_api_key_v1";
+const LS_LOCAL_OVERRIDES = "gc_local_overrides_v1"; // only used if no API
+
+// ===== Data (plate_norm -> { plateRaw, name, apartment })
 let whitelist = new Map();
 let entries = [];
 let whitelistLoaded = false;
 
+// Mode: "api" or "local"
+let dataMode = "local";
+
+// ======================= Helpers =======================
 function normPlate(p) {
   return (p || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
 function normTextTR(s) {
-  // makes searching Turkish names easier
   return (s || "")
     .toLowerCase()
     .replaceAll("ç","c")
@@ -36,7 +71,6 @@ function setResult(state, title, sub) {
 }
 
 function splitLine(line) {
-  // TR Excel often uses ';'
   const delim = line.includes(";") && !line.includes(",") ? ";" : ",";
   return line.split(delim).map(s => s.trim());
 }
@@ -62,7 +96,7 @@ function parseWhitelistCSV(text) {
     const plate_norm = normPlate(plateRaw);
     if (!plate_norm) continue;
 
-    map.set(plate_norm, { plateRaw, name, apartment });
+    map.set(plate_norm, { plateRaw, name, apartment, deleted: false });
   }
   return map;
 }
@@ -70,6 +104,7 @@ function parseWhitelistCSV(text) {
 function buildEntries(map) {
   const arr = [];
   for (const [plate_norm, v] of map.entries()) {
+    if (v.deleted) continue;
     arr.push({
       plate_norm,
       plateRaw: v.plateRaw || plate_norm,
@@ -105,22 +140,18 @@ function renderSuggestions(list) {
 function getSuggestions(raw) {
   const qNorm = normPlate(raw);
   const qText = normTextTR(raw.trim());
-
-  // start suggesting after 2 chars
   if (raw.trim().length < 2) return [];
 
   const matches = [];
   for (const e of entries) {
     let score = 999;
 
-    // plate-first matching
     if (qNorm) {
       if (e.plate_norm === qNorm) score = 0;
       else if (e.plate_norm.startsWith(qNorm)) score = 1;
       else if (e.plate_norm.includes(qNorm)) score = 2;
     }
 
-    // name / apartment matching
     if (score === 999 && qText) {
       if (e.nameSearch.startsWith(qText)) score = 3;
       else if (e.nameSearch.includes(qText)) score = 4;
@@ -158,53 +189,337 @@ function checkInput(finalCheck = false) {
     return;
   }
 
-  // EXACT plate => YES / GREEN
   const exact = whitelist.get(qNorm);
-  if (exact) {
+  if (exact && !exact.deleted) {
     const info = [exact.name, exact.apartment].filter(Boolean).join(" • ");
     setResult("green", "YES", info || "Authorized");
     renderSuggestions([]);
     return;
   }
 
-  // partial => suggestions
   const sugs = getSuggestions(raw);
   renderSuggestions(sugs);
 
-  if (sugs.length) {
-    setResult("neutral", "…", "Pick a suggestion (or keep typing)");
-  } else if (finalCheck) {
-    setResult("red", "NO", "Not authorized");
-  } else {
-    setResult("neutral", "…", "No matches yet");
+  if (sugs.length) setResult("neutral", "…", "Pick a suggestion (or keep typing)");
+  else if (finalCheck) setResult("red", "NO", "Not authorized");
+  else setResult("neutral", "…", "No matches yet");
+}
+
+// ======================= Tabs =======================
+function showTab(name) {
+  tabBtns.forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+  tabCheck.classList.toggle("hidden", name !== "check");
+  tabManage.classList.toggle("hidden", name !== "manage");
+}
+tabBtns.forEach(btn => btn.addEventListener("click", () => showTab(btn.dataset.tab)));
+
+// ======================= API / Local storage =======================
+function getApiBase() {
+  return (localStorage.getItem(LS_API_BASE) || "").trim().replace(/\/+$/,"");
+}
+function getApiKey() {
+  return (localStorage.getItem(LS_API_KEY) || "").trim();
+}
+
+function apiEnabled() {
+  return !!getApiBase() && !!getApiKey();
+}
+
+async function apiFetch(path, opts = {}) {
+  const base = getApiBase();
+  const key = getApiKey();
+  const headers = {
+    ...(opts.headers || {}),
+    "X-App-Key": key,
+  };
+  const res = await fetch(base + path, { ...opts, headers });
+  const text = await res.text();
+  let data = null;
+  try { data = JSON.parse(text); } catch { data = { raw: text }; }
+  if (!res.ok) throw new Error(data?.error || data?.detail || `HTTP ${res.status}`);
+  return data;
+}
+
+function loadLocalOverrides() {
+  try {
+    const obj = JSON.parse(localStorage.getItem(LS_LOCAL_OVERRIDES) || "{}");
+    return obj && typeof obj === "object" ? obj : {};
+  } catch {
+    return {};
   }
 }
 
-plateInput.addEventListener("input", () => checkInput(false));
-plateInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") checkInput(true);
-});
+function saveLocalOverrides(obj) {
+  localStorage.setItem(LS_LOCAL_OVERRIDES, JSON.stringify(obj));
+}
 
-btnClear.addEventListener("click", clearAll);
+// ======================= Load whitelist =======================
+async function loadFromApi() {
+  const data = await apiFetch("/api/list", { method: "GET" });
+  const map = new Map();
+  for (const row of (data.results || [])) {
+    const plateRaw = (row.plate || "").trim();
+    const plate_norm = normPlate(plateRaw);
+    if (!plate_norm) continue;
+    map.set(plate_norm, {
+      plateRaw,
+      name: (row.name || "").trim(),
+      apartment: (row.apt || "").trim(),
+      deleted: false
+    });
+  }
+  return map;
+}
+
+async function loadFromCsvWithLocalEdits() {
+  const url = new URL("whitelist.csv", window.location.href).toString();
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
+  const text = await res.text();
+
+  const base = parseWhitelistCSV(text);
+  const overrides = loadLocalOverrides();
+
+  for (const [k, v] of Object.entries(overrides)) {
+    base.set(k, v);
+  }
+  return base;
+}
 
 async function loadWhitelist() {
   try {
-    const url = new URL("whitelist.csv", window.location.href).toString();
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
+    whitelistLoaded = false;
+    stats.textContent = "Loading whitelist…";
+    setResult("neutral", "—", "Loading…");
 
-    const text = await res.text();
-    whitelist = parseWhitelistCSV(text);
+    // Prefer API if configured
+    if (apiEnabled()) {
+      whitelist = await loadFromApi();
+      dataMode = "api";
+    } else {
+      whitelist = await loadFromCsvWithLocalEdits();
+      dataMode = "local";
+    }
+
     entries = buildEntries(whitelist);
     whitelistLoaded = true;
 
-    stats.textContent = `Whitelist loaded: ${whitelist.size} cars`;
+    stats.textContent = `Whitelist loaded: ${entries.length} cars`;
     setResult("neutral", "—", "Type a plate / name / apartment");
+
+    renderManageList();
+    renderModeInfo();
   } catch (e) {
     whitelistLoaded = false;
     stats.textContent = `Whitelist NOT loaded: ${e.message}`;
     setResult("neutral", "—", "Whitelist not loaded");
+    dataMode = "local";
+    renderModeInfo();
   }
 }
 
+function renderModeInfo() {
+  const base = getApiBase();
+  if (dataMode === "api") {
+    modeInfo.textContent = `Mode: Cloudflare API ✅ (${base})`;
+  } else {
+    modeInfo.textContent = `Mode: Local (whitelist.csv + this device edits) ⚠️`;
+  }
+}
+
+// ======================= Manage tab =======================
+function renderManageList() {
+  if (!manageList) return;
+
+  const q = normTextTR(mSearch.value || "");
+  const filtered = entries.filter(e => {
+    if (!q) return true;
+    return (
+      e.plate_norm.toLowerCase().includes(q) ||
+      e.nameSearch.includes(q) ||
+      e.aptSearch.includes(q)
+    );
+  });
+
+  manageList.innerHTML = "";
+
+  filtered.forEach(e => {
+    const row = document.createElement("div");
+    row.className = "rowItem";
+    row.innerHTML = `
+      <div class="left">${e.plateRaw}</div>
+      <div class="right">${[e.name, e.apartment].filter(Boolean).join(" • ")}</div>
+      <button class="delBtn" type="button">Delete</button>
+    `;
+
+    row.querySelector(".delBtn").addEventListener("click", async () => {
+      const ok = confirm(`Delete ${e.plateRaw}?`);
+      if (!ok) return;
+
+      try {
+        if (dataMode === "api" && apiEnabled()) {
+          await apiFetch(`/api/delete?plate=${encodeURIComponent(e.plateRaw)}`, { method: "DELETE" });
+        } else {
+          // local delete => mark deleted
+          const overrides = loadLocalOverrides();
+          overrides[e.plate_norm] = { plateRaw: e.plateRaw, name: e.name, apartment: e.apartment, deleted: true };
+          saveLocalOverrides(overrides);
+        }
+        await loadWhitelist();
+      } catch (err) {
+        alert(`Delete failed: ${err.message}`);
+      }
+    });
+
+    manageList.appendChild(row);
+  });
+}
+
+mSearch.addEventListener("input", renderManageList);
+
+btnAdd.addEventListener("click", async () => {
+  const plateRaw = (mPlate.value || "").trim();
+  const name = (mName.value || "").trim();
+  const apartment = (mApt.value || "").trim();
+
+  const k = normPlate(plateRaw);
+  if (!k) return alert("Plate is required.");
+
+  try {
+    if (apiEnabled()) {
+      // API upsert
+      await apiFetch("/api/upsert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plate: plateRaw, name, apt: apartment })
+      });
+    } else {
+      // local upsert
+      const overrides = loadLocalOverrides();
+      overrides[k] = { plateRaw, name, apartment, deleted: false };
+      saveLocalOverrides(overrides);
+    }
+
+    mPlate.value = "";
+    mName.value = "";
+    mApt.value = "";
+    await loadWhitelist();
+    alert("Saved.");
+  } catch (err) {
+    alert(`Save failed: ${err.message}`);
+  }
+});
+
+btnExport.addEventListener("click", () => {
+  const header = "plate,name,apartment\n";
+  const rows = entries.map(e => {
+    const safe = (s) => `"${String(s ?? "").replace(/"/g,'""')}"`;
+    return [safe(e.plateRaw), safe(e.name), safe(e.apartment)].join(",");
+  }).join("\n");
+
+  const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `whitelist-${dataMode}-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+});
+
+// Settings save + reload
+function syncSettingsUi() {
+  apiBaseEl.value = getApiBase();
+  apiKeyEl.value = getApiKey();
+}
+syncSettingsUi();
+
+btnSaveSettings.addEventListener("click", () => {
+  const base = (apiBaseEl.value || "").trim().replace(/\/+$/,"");
+  const key = (apiKeyEl.value || "").trim();
+  localStorage.setItem(LS_API_BASE, base);
+  localStorage.setItem(LS_API_KEY, key);
+  alert("Saved settings on this device.");
+  loadWhitelist();
+});
+
+btnReload.addEventListener("click", () => loadWhitelist());
+
+// ======================= Scan button (phone camera) =======================
+async function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result);
+    fr.onerror = reject;
+    fr.readAsDataURL(file);
+  });
+}
+
+async function doScan(file) {
+  if (!apiEnabled()) {
+    alert("To use scan, set API Base + APP_KEY in Manage tab.");
+    showTab("manage");
+    return;
+  }
+
+  try {
+    setResult("neutral", "…", "Scanning…");
+    stats.textContent = "Scanning image…";
+
+    const imageDataUrl = await fileToDataUrl(file);
+
+    const data = await apiFetch("/api/scan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageDataUrl })
+    });
+
+    const plate = (data.plate || "").trim();
+    if (!plate) {
+      setResult("red", "NO", "Could not read plate. Try closer / straighter.");
+      stats.textContent = "Scan failed (no plate).";
+      return;
+    }
+
+    // Autofill and check
+    showTab("check");
+    plateInput.value = plate;
+    checkInput(true);
+    stats.textContent = `Whitelist loaded: ${entries.length} cars`;
+  } catch (err) {
+    setResult("red", "NO", `Scan error: ${err.message}`);
+    stats.textContent = "Scan error.";
+  }
+}
+
+btnScan.addEventListener("click", () => {
+  // open phone camera picker
+  camInput.value = "";
+  camInput.click();
+});
+
+camInput.addEventListener("change", async () => {
+  const file = camInput.files && camInput.files[0];
+  if (!file) return;
+  await doScan(file);
+});
+
+// ======================= Wiring (check tab) =======================
+plateInput.addEventListener("input", () => checkInput(false));
+plateInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") checkInput(true);
+});
+btnClear.addEventListener("click", clearAll);
+
+// Clear icon fallback
+clearImg.addEventListener("error", () => {
+  clearImg.style.display = "none";
+  clearSvg.style.display = "block";
+});
+
+// ======================= Service worker (optional) =======================
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./service-worker.js").catch(() => {});
+}
+
+// Start
 loadWhitelist().then(() => plateInput.focus());
