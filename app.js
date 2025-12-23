@@ -191,7 +191,7 @@ function getSuggestions(raw) {
 function clearAll() {
   plateInput.value = "";
   renderSuggestions([]);
-  setResult("neutral", "—", "Type a plate / name / apartment");
+  setResult("neutral", "—", "Plaka, isim veya daire no girin");
   plateInput.focus();
 }
 
@@ -206,7 +206,7 @@ function checkInput(finalCheck = false) {
   const qNorm = normPlate(raw);
 
   if (!raw.trim()) {
-    setResult("neutral", "—", "Type a plate / name / apartment");
+    setResult("neutral", "—", "Plaka, isim veya daire no girin");
     renderSuggestions([]);
     return;
   }
@@ -344,7 +344,7 @@ async function loadWhitelist() {
     whitelistLoaded = true;
 
     stats.textContent = `Whitelist loaded: ${entries.length} cars`;
-    setResult("neutral", "—", "Type a plate / name / apartment");
+    setResult("neutral", "—", "Plaka, isim veya daire no girin");
 
     renderManageList();
     renderModeInfo();
@@ -557,4 +557,5 @@ if ("serviceWorker" in navigator) {
 
 // Start
 loadWhitelist().then(() => plateInput.focus());
+
 
