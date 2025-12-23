@@ -14,9 +14,10 @@ const resultSub = document.getElementById("resultSub");
 const stats = document.getElementById("stats");
 
 // ===== Tabs
-const tabBtns = [...document.querySelectorAll(".tabBtn")];
+const tabBtns = [...document.querySelectorAll(".tabBtn[data-tab]")]; // only real tabs
 const tabCheck = document.getElementById("tab-check");
 const tabManage = document.getElementById("tab-manage");
+const btnLock = document.getElementById("btnLock");
 
 // ===== Manage tab elements
 const apiBaseEl = document.getElementById("apiBase");
@@ -38,6 +39,27 @@ const modeInfo = document.getElementById("modeInfo");
 const LS_API_BASE = "gc_api_base_v1";
 const LS_API_KEY = "gc_api_key_v1";
 const LS_LOCAL_OVERRIDES = "gc_local_overrides_v1"; // only used if no API
+
+// ===== Manage PIN lock (session only)
+const MANAGE_PIN = "1234";
+const SS_MANAGE_UNLOCK = "gc_manage_unlocked_session_v1";
+
+function isManageUnlocked() {
+  return sessionStorage.getItem(SS_MANAGE_UNLOCK) === "1";
+}
+function lockManage() {
+  sessionStorage.removeItem(SS_MANAGE_UNLOCK);
+}
+async function unlockManagePrompt() {
+  const pin = prompt("Enter Manage PIN:");
+  if (pin === null) return false;
+  if (pin.trim() === MANAGE_PIN) {
+    sessionStorage.setItem(SS_MANAGE_UNLOCK, "1");
+    return true;
+  }
+  alert("Wrong PIN.");
+  return false;
+}
 
 // ===== Data (plate_norm -> { plateRaw, name, apartment })
 let whitelist = new Map();
@@ -205,13 +227,31 @@ function checkInput(finalCheck = false) {
   else setResult("neutral", "…", "No matches yet");
 }
 
-// ======================= Tabs =======================
-function showTab(name) {
+// ======================= Tabs (PIN protected) =======================
+async function showTab(name) {
+  if (name === "manage" && !isManageUnlocked()) {
+    const ok = await unlockManagePrompt();
+    if (!ok) name = "check";
+  }
+
   tabBtns.forEach(b => b.classList.toggle("active", b.dataset.tab === name));
   tabCheck.classList.toggle("hidden", name !== "check");
   tabManage.classList.toggle("hidden", name !== "manage");
 }
-tabBtns.forEach(btn => btn.addEventListener("click", () => showTab(btn.dataset.tab)));
+
+tabBtns.forEach(btn =>
+  btn.addEventListener("click", async () => {
+    await showTab(btn.dataset.tab);
+  })
+);
+
+if (btnLock) {
+  btnLock.addEventListener("click", async () => {
+    lockManage();
+    alert("Manage locked.");
+    await showTab("check");
+  });
+}
 
 // ======================= API / Local storage =======================
 function getApiBase() {
@@ -292,7 +332,6 @@ async function loadWhitelist() {
     stats.textContent = "Loading whitelist…";
     setResult("neutral", "—", "Loading…");
 
-    // Prefer API if configured
     if (apiEnabled()) {
       whitelist = await loadFromApi();
       dataMode = "api";
@@ -360,7 +399,6 @@ function renderManageList() {
         if (dataMode === "api" && apiEnabled()) {
           await apiFetch(`/api/delete?plate=${encodeURIComponent(e.plateRaw)}`, { method: "DELETE" });
         } else {
-          // local delete => mark deleted
           const overrides = loadLocalOverrides();
           overrides[e.plate_norm] = { plateRaw: e.plateRaw, name: e.name, apartment: e.apartment, deleted: true };
           saveLocalOverrides(overrides);
@@ -387,14 +425,12 @@ btnAdd.addEventListener("click", async () => {
 
   try {
     if (apiEnabled()) {
-      // API upsert
       await apiFetch("/api/upsert", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plate: plateRaw, name, apt: apartment })
       });
     } else {
-      // local upsert
       const overrides = loadLocalOverrides();
       overrides[k] = { plateRaw, name, apartment, deleted: false };
       saveLocalOverrides(overrides);
@@ -457,7 +493,7 @@ async function fileToDataUrl(file) {
 async function doScan(file) {
   if (!apiEnabled()) {
     alert("To use scan, set API Base + APP_KEY in Manage tab.");
-    showTab("manage");
+    await showTab("manage");
     return;
   }
 
@@ -480,8 +516,7 @@ async function doScan(file) {
       return;
     }
 
-    // Autofill and check
-    showTab("check");
+    await showTab("check");
     plateInput.value = plate;
     checkInput(true);
     stats.textContent = `Whitelist loaded: ${entries.length} cars`;
@@ -492,7 +527,6 @@ async function doScan(file) {
 }
 
 btnScan.addEventListener("click", () => {
-  // open phone camera picker
   camInput.value = "";
   camInput.click();
 });
