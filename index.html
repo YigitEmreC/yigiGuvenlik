@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Plate Check</title>
+  <title>Plaka Sorgulama</title>
 
   <!-- bump v to refresh cache -->
   <link rel="stylesheet" href="./styles.css?v=21" />
@@ -15,16 +15,16 @@
 
       <!-- TABS -->
       <nav class="tabs" aria-label="Navigation">
-        <button class="tabBtn active" data-tab="check" type="button">Plate Check</button>
-        <button class="tabBtn" data-tab="manage" type="button">Manage</button>
-        <button id="btnLock" class="tabBtn" type="button" title="Lock Manage">Lock</button>
+        <button class="tabBtn active" data-tab="check" type="button">Plaka Sorgula</button>
+        <button class="tabBtn" data-tab="manage" type="button">Yönet</button>
+        <button id="btnLock" class="tabBtn" type="button" title="Lock Manage">Kitle</button>
       </nav>
 
       <!-- TAB: CHECK -->
       <section id="tab-check" class="tabSection">
         <div id="result" class="result neutral">
           <div id="resultTitle" class="resultTitle">—</div>
-          <div id="resultSub" class="resultSub">Type a plate / name / apartment</div>
+          <div id="resultSub" class="resultSub">Plaka, isim veya daire no girin</div>
         </div>
 
         <div class="searchRow">
@@ -61,7 +61,7 @@
         <div id="suggestions" class="suggestions"></div>
 
         <div class="footer">
-          <div class="stats" id="stats">Loading whitelist…</div>
+          <div class="stats" id="stats">Plaka listesi bekleniyor…</div>
         </div>
       </section>
 
@@ -71,8 +71,7 @@
         <div class="panel">
           <div class="panelTitle">Cloudflare API (recommended)</div>
           <div class="smallNote">
-            Set your Worker base URL + APP_KEY. This enables add/delete + scan on any device.
-            If you leave this empty, the site uses <b>whitelist.csv</b> + saves edits on this device only.
+            API URL ve APP_KEY girin, yoksa otomatik olarak <b>whitelist.csv</b> dosyasından bilgiyi çekecek ve bölgesel olarak kayıt altına alınacak girdiler
           </div>
 
           <div class="grid2">
@@ -85,37 +84,37 @@
               <input id="apiKey" class="in" type="password" placeholder="(kept on this device)" />
             </div>
 
-            <button id="btnSaveSettings" class="btnPrimary" type="button">Save settings</button>
-            <button id="btnReload" class="btnGhost" type="button">Reload data</button>
+            <button id="btnSaveSettings" class="btnPrimary" type="button">Ayarları Kaydet</button>
+            <button id="btnReload" class="btnGhost" type="button">Verileri yenile</button>
           </div>
         </div>
 
         <div class="panel">
-          <div class="panelTitle">Add / Update plate</div>
+          <div class="panelTitle">Plaka ekle veya güncelle</div>
           <div class="grid3">
             <div>
-              <label class="lbl">Plate</label>
+              <label class="lbl">Plaka</label>
               <input id="mPlate" class="in" placeholder="34 ABC 123" />
             </div>
             <div>
-              <label class="lbl">Name</label>
+              <label class="lbl">İsim</label>
               <input id="mName" class="in" placeholder="Name Surname" />
             </div>
             <div>
-              <label class="lbl">Apartment</label>
-              <input id="mApt" class="in" placeholder="C-03" />
+              <label class="lbl">Apartman</label>
+              <input id="mApt" class="in" placeholder="A00" />
             </div>
 
-            <button id="btnAdd" class="btnPrimary" type="button">Save / Update</button>
+            <button id="btnAdd" class="btnPrimary" type="button">Kaydet / Güncelle</button>
           </div>
         </div>
 
         <div class="panel">
-          <div class="panelTitle">Current list</div>
+          <div class="panelTitle">Anlık liste</div>
 
           <div class="listTop">
             <input id="mSearch" class="in" placeholder="Search plate / name / apt…" />
-            <button id="btnExport" class="btnGhost" type="button">Export CSV</button>
+            <button id="btnExport" class="btnGhost" type="button">CSV'yi çıkart</button>
           </div>
 
           <div id="modeInfo" class="smallNote" style="margin-top:10px;"></div>
@@ -131,3 +130,4 @@
   <script src="./app.js?v=21"></script>
 </body>
 </html>
+
