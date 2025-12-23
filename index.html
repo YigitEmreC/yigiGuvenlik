@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gate Checker</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <meta name="theme-color" content="#111111" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header>
+    <div class="title">Gate Checker</div>
+    <div class="subtitle">Whitelist + IN/OUT logs (offline)</div>
+  </header>
+
+  <main>
+    <section class="card">
+      <div class="row">
+        <label class="label">Guard name (optional)</label>
+        <input id="guardName" class="input" placeholder="e.g., Ali" autocomplete="name" />
+      </div>
+
+      <div class="row">
+        <label class="label">Plate</label>
+        <input id="plateInput" class="input plate" placeholder="34 ABC 123" inputmode="latin" autocomplete="off" />
+        <div id="suggestions" class="suggestions"></div>
+      </div>
+
+      <div id="result" class="result neutral">
+        <div class="status" id="statusText">Type a plate…</div>
+        <div class="detail" id="detailText">—</div>
+      </div>
+
+      <div class="btnrow">
+        <button id="btnIn" class="btn primary" disabled>IN</button>
+        <button id="btnOut" class="btn primary" disabled>OUT</button>
+        <button id="btnClear" class="btn">Clear</button>
+      </div>
+
+      <div class="small">
+        Tip: plates are matched after normalization (uppercase + no spaces). Example: <b>34 ABC 123 → 34ABC123</b>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="row between">
+        <div>
+          <div class="label">Recent logs</div>
+          <div class="small" id="counts"></div>
+        </div>
+        <div class="btnrow tight">
+          <button id="btnExportLogs" class="btn">Export logs CSV</button>
+          <button id="btnAdmin" class="btn">Admin</button>
+        </div>
+      </div>
+
+      <div class="tablewrap">
+        <table id="logsTable">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Dir</th>
+              <th>Plate</th>
+              <th>Auth</th>
+              <th>Resident</th>
+              <th>Guard</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="adminPanel" class="card hidden">
+      <div class="row between">
+        <div>
+          <div class="label">Admin</div>
+          <div class="small">Import whitelist (CSV), change PIN, clear data</div>
+        </div>
+        <button id="btnCloseAdmin" class="btn">Close</button>
+      </div>
+
+      <div class="row">
+        <label class="label">Import whitelist CSV</label>
+        <input id="csvFile" type="file" accept=".csv,text/csv" />
+        <div class="small">
+          Expected columns (at least): <b>plate</b>, resident (optional), block (optional), active (optional), notes (optional)
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="btnExportWhitelist" class="btn">Export whitelist CSV</button>
+        <button id="btnClearLogs" class="btn warn">Clear logs</button>
+        <button id="btnClearAll" class="btn danger">Clear ALL (whitelist + logs)</button>
+      </div>
+
+      <hr class="sep" />
+
+      <div class="row">
+        <label class="label">Change Admin PIN</label>
+        <div class="btnrow tight">
+          <input id="newPin" class="input" placeholder="New PIN (4-10 digits)" inputmode="numeric" />
+          <button id="btnSetPin" class="btn">Set PIN</button>
+        </div>
+        <div class="small">Default PIN is <b>1234</b>. Change it after first setup.</div>
+      </div>
+    </section>
+
+    <section class="footer small">
+      Install: Android → browser menu → <b>Install app</b>. iPhone → Share → <b>Add to Home Screen</b>.
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("./service-worker.js");
+    }
+  </script>
+</body>
+</html>
